@@ -1,272 +1,180 @@
 ---
-title: "Ansible Junos RPC Module: RedHat vs Native Collection Examples"
+title: "Ansible Junos RPC Module: Running RedHat junipernetworks.junos Modules in juniper.device Collection"
 date: 2025-08-08 12:00:00 -500
 categories: [JuniperAutomation, ansible, junos]
-tags: [ansible, junos, juniper, automation, rpc, netconf, pyez]
+tags: [ansible, junos, juniper, automation, rpc, netconf, pyez, compatibility]
 ---
 
-# Ansible Junos RPC Module: RedHat vs Native Collection Examples
+# Ansible Junos RPC Module: Running RedHat junipernetworks.junos Modules in juniper.device Collection
 
-This guide demonstrates how to execute Junos RPC commands using both the RedHat Ansible `junipernetworks.junos.junos_rpc` module and the native `juniper.device.rpc` module from the Juniper device collections.
+The `juniper.device` collection allows continued use of RedHat style module paths (`junipernetworks.junos.junos_rpc`). This enables existing playbooks to run without edits while new automation can adopt `juniper.device.rpc`. This post shows:
 
-## Method 1: RedHat Ansible junos_rpc via juniper.device Collections
+1. RedHat module path playbook (`junipernetworks.junos.junos_rpc`)
+2. Native module path playbook (`juniper.device.rpc`)
+3. Inventory patterns (NETCONF and PyEZ)
+4. RPC usage examples
+5. Troubleshooting and gradual adoption tips
 
-### Step 1: Create the Inventory File
+---
 
-Create an inventory file with NETCONF connection parameters:
+## 1. RedHat Module Path Playbook (Unmodified)
+
+### Inventory (NETCONF Transport)
 
 ```ini
 [junos]
 <Device IP>
- 
+
 [junos:vars]
 ansible_network_os=juniper.device.junos
 ansible_ssh_user=<username>
 ansible_ssh_pass=<password>
 ansible_port=22
 ansible_connection=ansible.netcommon.netconf
- 
+
 [all:vars]
 ansible_python_interpreter=<python interpreter path>
 ```
 
-### Step 2: Write the Playbook for Junos RPC
-
-Create a playbook to execute RPC commands using the RedHat collection:
+### Playbook
 
 ```yaml
 ---
-- name: Functional Test - junos_rpc module
-  hosts: all
+- name: Run RPC using RedHat module path
+  hosts: junos
   gather_facts: false
   connection: ansible.netcommon.netconf
   collections:
     - junipernetworks.junos
- 
+
   tasks:
-    - name: Get system information using RPC
+    - name: Get system information
       junipernetworks.junos.junos_rpc:
         rpc: get-system-information
-      register: system_info
- 
-    - name: Assert system information RPC returned XML
+      register: sysinfo
+
+    - name: Show RPC result
       debug:
-        var: system_info
+        var: sysinfo.xml
 ```
 
-### Step 3: Execute the Playbook
-
-Run the playbook with the following command:
+### Run
 
 ```bash
-ansible-playbook -i inventory_rh pb.juniper_junos_rh_rpc.yml
+ansible-playbook -i inventory_rh pb.redhat_rpc.yml
 ```
 
-### Expected Output
+---
 
-```bash
-[WARNING]: errors were encountered during the plugin load for junipernetworks.junos.junos_rpc: ["'NoneType' object has no attribute 'get'"]
-[WARNING]: errors were encountered during the plugin load for debug: ["'NoneType' object has no attribute 'get'"]
+## 2. Native Module Path Playbook (`juniper.device.rpc`)
 
-PLAY [Functional Test - junos_rpc module] ****************************************************************************************
-
-TASK [Get system information using RPC] ******************************************************************************************
-[WARNING]: errors were encountered during the plugin load for junipernetworks.junos.junos: ["'NoneType' object has no attribute 'get'"]
-ok: [10.220.17.17]
-
-TASK [Assert system information RPC returned XML] ********************************************************************************
-ok: [10.220.17.17] => {
-    "system_info": {
-        "changed": false,
-        "failed": false,
-        "output": [
-            "<rpc-reply message-id=\"urn:uuid:418b4192-936d-47c7-8bda-db7b7156d8cc\"><system-information><host-name>evoeventtestb</host-name><hardware-model>mx960</hardware-model><os-name>junos</os-name><os-version>25.4I-20250615_dev_common.0.1157</os-version><serial-number>VM685037CBB2</serial-number></system-information></rpc-reply>"
-        ],
-        "xml": "<rpc-reply message-id=\"urn:uuid:418b4192-936d-47c7-8bda-db7b7156d8cc\"><system-information><host-name>evoeventtestb</host-name><hardware-model>mx960</hardware-model><os-name>junos</os-name><os-version>25.4I-20250615_dev_common.0.1157</os-version><serial-number>VM685037CBB2</serial-number></system-information></rpc-reply>"
-    }
-}
-
-PLAY RECAP ***********************************************************************************************************************
-10.220.17.17               : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-```
-
-## Method 2: Native Junos RPC via juniper.device Collection
-
-### Step 1: Create the Inventory File
-
-Create an inventory file using the native PyEZ connection:
+### Inventory (PyEZ Transport Example)
 
 ```ini
 [junos]
-pyez_connection_testcases  ansible_host=x.x.x.x  ansible_user=xxx  ansible_ssh_pass=xxxx ansible_port=22 ansible_connection=juniper.device.pyez ansible_command_timeout=300
+device1 ansible_host=x.x.x.x ansible_user=<user> ansible_ssh_pass=<pass> ansible_port=22 ansible_connection=juniper.device.pyez ansible_command_timeout=300
 
 [all:vars]
 ansible_python_interpreter=<python interpreter path>
 ```
 
-### Step 2: Write the Playbook for Native Junos RPC
-
-Create a playbook using the native Juniper device collection:
+### Playbook
 
 ```yaml
 ---
-- name: juniper.device.rpc module
-  hosts: all
+- name: Run RPCs using native module path
+  hosts: junos
   gather_facts: false
-
-  tasks:
-    - name: "Execute single RPC get-system-information without any kwargs"
-      juniper.device.rpc:
-        rpcs:
-          - "get-system-information"
-      register: rpc_output 
-      ignore_errors: true
-      tags: [test1]
-
-    - name: Check RPC output 
-      debug:
-        var: rpc_output.stdout
-```
-
-### Step 3: Execute the Native Playbook
-
-Run the native RPC playbook:
-
-```bash
-ansible-playbook -i inventory pb.juniper_junos_native_rpc.yml
-```
-
-### Expected Output (Cleaner XML)
-
-```bash
-PLAY [juniper.device.rpc module] *************************************************************************************************
-
-TASK [Execute single RPC get-system-information without any kwargs] ************************************************************
-ok: [pyez_connection_testcases]
-
-TASK [Check RPC output] **********************************************************************************************************
-ok: [pyez_connection_testcases] => {
-    "rpc_output.stdout": "<system-information>\n  <host-name>evoeventtestb</host-name>\n  <hardware-model>mx960</hardware-model>\n  <os-name>junos</os-name>\n  <os-version>25.4I-20250615_dev_common.0.1157</os-version>\n  <serial-number>VM685037CBB2</serial-number>\n</system-information>\n"
-}
-
-PLAY RECAP ***********************************************************************************************************************
-pyez_connection_testcases : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
-```
-
-## Comparison: RedHat vs Native RPC Collections
-
-| Feature | RedHat Collection | Native Collection |
-|---------|------------------|-------------------|
-| **Connection Type** | `ansible.netcommon.netconf` | `juniper.device.pyez` |
-| **RPC Syntax** | Single RPC string | List of RPCs |
-| **Output Format** | Full RPC reply with metadata | Clean XML output |
-| **Multiple RPCs** | One per task | Multiple in single task |
-| **Error Handling** | Standard Ansible | Enhanced PyEZ handling |
-| **Performance** | Standard NETCONF | Optimized PyEZ |
-
-## Key Differences
-
-### RedHat Collection Output
-- **Full RPC Reply**: Includes `<rpc-reply>` wrapper and message IDs
-- **Both formats**: Provides both `output` array and `xml` string
-- **Standard structure**: Follows Ansible network module patterns
-
-### Native Collection Output
-- **Clean XML**: Direct system information without RPC wrapper
-- **Formatted output**: Properly indented XML structure
-- **Multiple RPC support**: Can execute multiple RPCs in single task
-- **Streamlined**: Only essential data in response
-
-## Advanced RPC Examples
-
-### Multiple RPCs with Native Collection
-
-```yaml
----
-- name: Execute multiple RPCs
-  hosts: all
-  gather_facts: false
-  
-  tasks:
-    - name: "Execute multiple RPCs"
-      juniper.device.rpc:
-        rpcs:
-          - "get-system-information"
-          - "get-chassis-inventory"
-          - "get-interface-information terse"
-        format: "xml"
-      register: multi_rpc_output
-
-    - name: Display results
-      debug:
-        var: multi_rpc_output
-```
-
-### RPC with Arguments (RedHat Collection)
-
-```yaml
----
-- name: RPC with arguments
-  hosts: all
-  gather_facts: false
-  connection: ansible.netcommon.netconf
   collections:
-    - junipernetworks.junos
-  
-  tasks:
-    - name: Get interface information with arguments
-      junipernetworks.junos.junos_rpc:
-        rpc: get-interface-information
-        args:
-          interface-name: ge-0/0/0
-          terse: true
-      register: interface_info
+    - juniper.device
 
-    - name: Display interface info
-      debug:
-        var: interface_info
+  tasks:
+    - name: Execute single RPC
+      juniper.device.rpc:
+        rpcs:
+          - get-system-information
+      register: rpc_single
+
+    - debug:
+        var: rpc_single.stdout
+
+    - name: Execute multiple RPCs
+      juniper.device.rpc:
+        rpcs:
+          - get-system-information
+          - get-chassis-inventory
+          - get-interface-information terse
+        format: xml
+      register: rpc_multi
+
+    - debug:
+        var: rpc_multi
 ```
 
-## Best Practices
+### Run
 
-### When to Use RedHat Collection
-- **Multi-vendor environments** where consistency is important
-- **Standard Ansible workflows** that require uniform module behavior
-- **Simple RPC calls** with basic requirements
-- **Integration with existing** Red Hat Ansible workflows
-
-### When to Use Native Collection
-- **Juniper-only environments** where optimization matters
-- **Complex RPC operations** requiring multiple calls
-- **Performance-critical** automation tasks
-- **Advanced PyEZ features** and error handling
-
-## Troubleshooting
-
-### Common Warning Messages
-The warning `"'NoneType' object has no attribute 'get'"` in the RedHat collection is typically harmless and doesn't affect RPC execution.
-
-### RPC Execution Issues
-
-#### 1. Invalid RPC Names
 ```bash
-# Correct RPC format
+ansible-playbook -i inventory_native pb.native_rpc.yml
+```
+
+---
+
+## 3. Repository Layout Example
+
+```
+_playbooks/
+  pb.redhat_rpc.yml
+  pb.native_rpc.yml
+inventory_rh
+inventory_native
+```
+
+---
+
+## 4. RPC Naming Patterns
+
+Correct (hyphenated, lower-case):
+```
 get-system-information
 get-chassis-inventory
+get-interface-information
+get-interface-information terse
+```
 
-# Incorrect format (avoid hyphens in wrong places)
+Avoid:
+```
 get_system_information
+Get-System-Information
 ```
 
-#### 2. Connection Problems
-- Verify NETCONF is enabled: `set system services netconf ssh`
-- Check network connectivity on port 830
-- Ensure proper authentication credentials
+---
 
-#### 3. Timeout Issues
-```yaml
-# Increase timeout for long-running RPCs
-ansible_command_timeout: 300
+## 5. Troubleshooting
+
+| Symptom | Check | Fix |
+|---------|-------|-----|
+| ConnectionError get_capabilities | NETCONF enabled | set system services netconf ssh |
+| Timeout on large RPC | Long inventory/interface queries | Increase ansible_command_timeout |
+| Empty output | RPC spelling or permissions | Verify RPC name (show rpc) |
+| Warning: NoneType .get | Loader quirk | Ignore if task succeeds |
+| Auth failure | Credentials / SSH reachability | ssh -s netconf <device-ip> |
+
+### Quick Diagnostics
+
+```bash
+ssh -s netconf <device-ip>
+nc -vz <device-ip> 830
 ```
 
+Increase timeout (inventory example):
+```ini
+ansible_command_timeout=300
+```
 
+---
+
+## 6. Summary
+
+- RedHat `junipernetworks.junos.junos_rpc` modules run unchanged under the `juniper.device` collection.
+- Native `juniper.device.rpc` offers multi-RPC execution and PyEZ transport use.
+- Both paths can coexist; adopt native naming for new automation while keeping existing playbooks operational.
