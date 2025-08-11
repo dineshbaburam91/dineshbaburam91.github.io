@@ -29,7 +29,7 @@ github:
   username: dineshbaburam91 # change to your GitHub username
 
 twitter:
-  username: dineshbaburam91 # change to your Twitter username
+  username: JunosAutomation # change to your Twitter username
 
 social:
   # Change to your full name.
@@ -39,7 +39,7 @@ social:
   links:
     # The first element serves as the copyright owner's link
     - https://twitter.com/junosAutomation # change to your Twitter homepage
-    - https://github.com/junosAutomation # change to your GitHub homepage
+    - https://github.com/Juniper/junosautomation # change to your GitHub homepage
     # Uncomment below to add more social links
     # - https://www.facebook.com/username
     # - https://www.linkedin.com/in/username
@@ -224,3 +224,12 @@ jekyll-archives:
   permalinks:
     tag: /tags/:name/
     category: /categories/:name/
+
+favicon: ""
+apple_touch_icon: ""
+favicon_16x16: ""
+favicon_32x32: ""
+android_chrome_192x192: ""
+android_chrome_512x512: ""
+mstile_150x150: ""
+webmanifest: ""
