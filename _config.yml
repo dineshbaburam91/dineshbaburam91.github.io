@@ -26,7 +26,7 @@ description: >- # used by seo meta and the atom feed
 url: "https://dineshbaburam91.github.io"
 
 github:
-  username: dineshbaburam91 # change to your GitHub username
+  username: https://github.com/Juniper/junosautomation # change to your GitHub username
 
 twitter:
   username: JunosAutomation # change to your Twitter username
@@ -34,8 +34,8 @@ twitter:
 social:
   # Change to your full name.
   # It will be displayed as the default author of the posts and the copyright owner in the Footer
-  name: junosAutomation # change to your name
-  email: example@domain.com # change to your email address
+  name: JunosAutomation # change to your name
+  email: EXT-jnpr-community-netdev <jnpr-community-netdev@juniper.net> # change to your email address
   links:
     # The first element serves as the copyright owner's link
     - https://twitter.com/junosAutomation # change to your Twitter homepage
