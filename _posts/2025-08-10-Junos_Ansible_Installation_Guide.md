@@ -1,11 +1,11 @@
 ---
-title: Junos Ansible Installation Guide
+title: Junos Ansible Installation Guide to run junipernetworks.junos Modules in juniper.device Collection
 date: 2025-08-10 12:00:00 -500
 categories: [JuniperAutomation, junos, ansible]
 tags: [junos, juniper, automation, ansible, installation, guide]
 ---
 
-# Junos Ansible Installation Guide
+# Junos Ansible Installation Guide to run junipernetworks.junos Modules in juniper.device Collection
 
 This guide walks you through the installation process for Junos Ansible modules using the merged collection approach.
 
