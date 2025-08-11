@@ -16,7 +16,7 @@ timezone: Asia/Kolkata
 
 title: Junos Automation # the main title
 
-tagline: Stories of Juniper Automation # it will display as the subtitle
+tagline: Stories of HPE Juniper Networking Automation # it will display as the subtitle
 
 description: >- # used by seo meta and the atom feed
   Junos Automation Blogs.
