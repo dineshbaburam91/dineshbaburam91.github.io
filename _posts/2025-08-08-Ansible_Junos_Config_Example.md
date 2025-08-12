@@ -10,9 +10,11 @@ tags: [ansible, junos, juniper, automation, logging, config, netconf, pyez, roll
 The `juniper.device` collection allows continued use of RedHat style logging module paths (`junipernetworks.junos.junos_logging_global`) while new playbooks can use the native configuration module `juniper.device.config`.  
 This post shows:
 1. RedHat logging playbook (junos_logging_global states: merged / replaced / overridden / gathered / rendered / deleted)
-2. Native configuration playbook (merge / replace / commit / check / rollback / retrieve)
-3. Inventory examples (NETCONF vs PyEZ)
-4. Troubleshooting
+2. Execute RedHat logging module via `juniper.device` namespace
+3. Native configuration playbook (merge / replace / commit / check / rollback / retrieve)
+4. Inventory examples (NETCONF vs PyEZ)
+5. Troubleshooting
+6. Summary
 
 ---
 
@@ -133,7 +135,58 @@ ansible-playbook -i inventory_rh pb.redhat_logging.yml -vv
 
 ---
 
-## 2. Native Configuration Playbook (juniper.device.config)
+## 2. Execute RedHat Logging Using juniper.device Namespace
+
+You can invoke the same RedHat logging module through the `juniper.device` namespace (`juniper.device.junos_logging_global`) without changing task logic.
+
+### Playbook (Namespace Compatibility)
+
+```yaml
+---
+- name: Manage logging via juniper.device namespace (compatibility)
+  hosts: junos
+  gather_facts: false
+  connection: ansible.netcommon.netconf
+  collections:
+    - juniper.device
+
+  vars:
+    ri_name: "LOG-INST-A2"
+    src_addr: "192.0.2.20"
+
+  tasks:
+    - name: MERGED - Minimal logging (compat call)
+      juniper.device.junos_logging_global:
+        state: merged
+        config:
+          source_address: "{{ src_addr }}"
+          routing_instance: "{{ ri_name }}"
+          files:
+            - name: "compat_file"
+              any: { level: "info" }
+      register: compat_merge
+
+    - debug:
+        var: compat_merge.changed
+
+    - name: GATHERED - Show current logging (compat call)
+      juniper.device.junos_logging_global:
+        state: gathered
+      register: compat_gather
+
+    - debug:
+        var: compat_gather.gathered
+```
+
+### Run
+
+```bash
+ansible-playbook -i inventory_rh pb.compat_logging_namespace.yml -vv
+```
+
+---
+
+## 3. Native Configuration Playbook (juniper.device.config)
 
 ### Inventory (PyEZ Transport)
 
@@ -243,11 +296,12 @@ ansible-playbook -i inventory_native pb.native_config.yml -vv
 
 ---
 
-## 3. Directory Structure Example
+## 4. Directory Structure Example
 
 ```
 _playbooks/
   pb.redhat_logging.yml
+  pb.compat_logging_namespace.yml
   pb.native_config.yml
 files/
   system_services.conf
@@ -266,7 +320,7 @@ system {
 
 ---
 
-## 4. Troubleshooting
+## 5. Troubleshooting
 
 | Issue | Check | Fix |
 |-------|-------|-----|
@@ -285,10 +339,9 @@ show system rollback
 
 ---
 
-## 5. Summary
+## 6. Summary
 
-- RedHat logging module (`junipernetworks.junos.junos_logging_global`) runs unchanged under the current collection model.
-- Native `juniper.device.config` drives general configuration workflows with merge, replace, check, commit, retrieve, rollback.
-- Use both side by side; migrate gradually as needed.
-
----
+- RedHat logging module (`junipernetworks.junos.junos_logging_global`) runs unchanged.
+- The same module can be executed via `juniper.device.junos_logging_global` namespace.
+- Native `juniper.device.config` handles general configuration workflows (merge, replace, check, commit, retrieve, rollback).
+- Use all side by side; migrate gradually

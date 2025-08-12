@@ -7,19 +7,22 @@ tags: [ansible, junos, juniper, automation, rpc, netconf, pyez, compatibility]
 
 # Ansible Junos RPC Module: Running RedHat junipernetworks.junos Modules in juniper.device Collection
 
-The `juniper.device` collection allows continued use of RedHat style module paths (`junipernetworks.junos.junos_rpc`). This enables existing playbooks to run without edits while new automation can adopt `juniper.device.rpc`. This post shows:
+The `juniper.device` collection allows continued use of RedHat style module paths (`junipernetworks.junos.junos_rpc`). Existing playbooks run unmodified while new automation may adopt `juniper.device.rpc`. You can also call the RedHat RPC task using the `juniper.device` namespace (`juniper.device.junos_rpc`). This post shows:
 
 1. RedHat module path playbook (`junipernetworks.junos.junos_rpc`)
 2. Native module path playbook (`juniper.device.rpc`)
-3. Inventory patterns (NETCONF and PyEZ)
-4. RPC usage examples
-5. Troubleshooting and gradual adoption tips
+3. Executing RedHat RPC via juniper.device namespace
+4. Inventory patterns (NETCONF / PyEZ / local)
+5. RPC naming patterns
+6. RPC usage cheat sheet
+7. Troubleshooting
+8. Summary
 
 ---
 
-## 1. RedHat Module Path Playbook (Unmodified)
+## 1. RedHat Module Path Playbook (Unchanged)
 
-### Inventory (NETCONF Transport)
+### Inventory (NETCONF)
 
 ```ini
 [junos]
@@ -64,18 +67,33 @@ ansible_python_interpreter=<python interpreter path>
 ansible-playbook -i inventory_rh pb.redhat_rpc.yml
 ```
 
+### Sample Output (Excerpt)
+
+```
+<rpc-reply>
+  <system-information>...</system-information>
+</rpc-reply>
+```
+
 ---
 
 ## 2. Native Module Path Playbook (`juniper.device.rpc`)
 
-### Inventory (PyEZ Transport Example)
+### Inventory (PyEZ Transport)
 
 ```ini
 [junos]
-device1 ansible_host=x.x.x.x ansible_user=<user> ansible_ssh_pass=<pass> ansible_port=22 ansible_connection=juniper.device.pyez ansible_command_timeout=300
+pyez_rpc ansible_host=x.x.x.x ansible_user=<user> ansible_ssh_pass=<pass> ansible_port=22 \
+ansible_connection=juniper.device.pyez ansible_command_timeout=300
 
 [all:vars]
 ansible_python_interpreter=<python interpreter path>
+```
+
+(Local/on-box)
+```ini
+[junos]
+localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3
 ```
 
 ### Playbook
@@ -95,7 +113,8 @@ ansible_python_interpreter=<python interpreter path>
           - get-system-information
       register: rpc_single
 
-    - debug:
+    - name: Show single RPC
+      debug:
         var: rpc_single.stdout
 
     - name: Execute multiple RPCs
@@ -107,8 +126,9 @@ ansible_python_interpreter=<python interpreter path>
         format: xml
       register: rpc_multi
 
-    - debug:
-        var: rpc_multi
+    - name: Show multi RPC output
+      debug:
+        var: rpc_multi.stdout
 ```
 
 ### Run
@@ -117,21 +137,55 @@ ansible_python_interpreter=<python interpreter path>
 ansible-playbook -i inventory_native pb.native_rpc.yml
 ```
 
+### Sample Output (Excerpt)
+
+```
+stdout[0]: <system-information>...</system-information>
+stdout[1]: <chassis-inventory>...</chassis-inventory>
+stdout[2]: <interface-information>...</interface-information>
+```
+
 ---
 
-## 3. Repository Layout Example
+## 3. Executing RedHat RPC Using juniper.device Namespace
+
+You can invoke the RedHat RPC module through `juniper.device.junos_rpc`.
+
+```yaml
+---
+- name: Run RedHat RPC via juniper.device namespace
+  hosts: junos
+  gather_facts: false
+  connection: ansible.netcommon.netconf
+  collections:
+    - juniper.device
+
+  tasks:
+    - name: Get system information
+      juniper.device.junos_rpc:
+        rpc: get-system-information
+      register: compat_rpc
+
+    - debug:
+        var: compat_rpc.xml
+```
+
+---
+
+## 4. Directory Structure Example
 
 ```
 _playbooks/
   pb.redhat_rpc.yml
   pb.native_rpc.yml
+  pb.compat_namespace_rpc.yml
 inventory_rh
 inventory_native
 ```
 
 ---
 
-## 4. RPC Naming Patterns
+## 5. RPC Naming Patterns
 
 Correct (hyphenated, lower-case):
 ```
@@ -149,32 +203,51 @@ Get-System-Information
 
 ---
 
-## 5. Troubleshooting
+## 6. RPC Usage Cheat Sheet
 
-| Symptom | Check | Fix |
+| Goal | RedHat Path | Native Path |
+|------|-------------|-------------|
+| Single RPC | rpc: get-system-information | rpcs: [get-system-information] |
+| Multiple RPCs | One task per RPC | rpcs: [list, of, rpcs] |
+| XML output | (default) | format: xml |
+| Basic text (CLI alt) | Use junos_command | N/A (rpc is NETCONF) |
+| Increase timeout | ansible_command_timeout in inventory | same |
+| Namespace compatibility | junipernetworks.junos.junos_rpc | juniper.device.junos_rpc |
+
+Common return fields:
+- RedHat path: xml (full <rpc-reply>), changed (False), failed
+- Native path: stdout (list of inner XML blocks), rpcs (list), changed (False), failed
+
+---
+
+## 7. Troubleshooting
+
+| Symptom | Cause | Fix |
 |---------|-------|-----|
-| ConnectionError get_capabilities | NETCONF enabled | set system services netconf ssh |
-| Timeout on large RPC | Long inventory/interface queries | Increase ansible_command_timeout |
-| Empty output | RPC spelling or permissions | Verify RPC name (show rpc) |
+| ConnectionError get_capabilities | NETCONF disabled | set system services netconf ssh |
+| Empty stdout/xml | Misspelled RPC | Verify with show rpc |
+| Timeout on inventory RPC | Large chassis / many FPCs | Increase ansible_command_timeout |
 | Warning: NoneType .get | Loader quirk | Ignore if task succeeds |
-| Auth failure | Credentials / SSH reachability | ssh -s netconf <device-ip> |
+| Auth failure | Bad credentials / SSH | ssh -s netconf <device-ip> |
+| Multi-RPC fails mid-run | One RPC invalid | Validate list individually |
 
-### Quick Diagnostics
+Quick diagnostics:
 
 ```bash
 ssh -s netconf <device-ip>
 nc -vz <device-ip> 830
 ```
 
-Increase timeout (inventory example):
+Inventory timeout example:
 ```ini
 ansible_command_timeout=300
 ```
 
 ---
 
-## 6. Summary
+## 8. Summary
 
-- RedHat `junipernetworks.junos.junos_rpc` modules run unchanged under the `juniper.device` collection.
-- Native `juniper.device.rpc` offers multi-RPC execution and PyEZ transport use.
-- Both paths can coexist; adopt native naming for new automation while keeping existing playbooks operational.
+- RedHat `junipernetworks.junos.junos_rpc` runs unchanged within the `juniper.device` collection.
+- Native `juniper.device.rpc` supports multiple RPCs per task and cleaner inner XML output.
+- You can also call the RedHat RPC via `juniper.device.junos_rpc` namespace.
+- Both approaches coexist; adopt native for new automation while keeping existing playbooks intact.

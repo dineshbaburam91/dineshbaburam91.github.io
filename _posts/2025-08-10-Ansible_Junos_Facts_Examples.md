@@ -7,13 +7,16 @@ tags: [ansible, junos, juniper, automation, facts, netconf, pyez, compatibility]
 
 # Ansible Junos Facts Module: Running RedHat junipernetworks.junos Modules in juniper.device Collection
 
-The `juniper.device` collection allows continued use of RedHat style module paths (`junipernetworks.junos.junos_facts`). Existing playbooks run unmodified while new automation may adopt `juniper.device.facts`. This post shows:
+The `juniper.device` collection allows continued use of RedHat style module paths (`junipernetworks.junos.junos_facts`). Existing playbooks run unmodified while new automation may adopt `juniper.device.facts`. You can also execute the RedHat facts task using the `juniper.device` collection namespace. This post shows:
 
 1. RedHat module path playbook (`junipernetworks.junos.junos_facts`)
 2. Native module path playbook (`juniper.device.facts`)
-3. Inventory patterns (NETCONF and PyEZ)
-4. Returned data fields
-5. Troubleshooting and adoption tips
+3. Executing RedHat task via juniper.device namespace
+4. Inventory patterns (NETCONF / PyEZ / local)
+5. Returned data fields
+6. Facts usage cheat sheet
+7. Troubleshooting
+8. Summary
 
 ---
 
@@ -132,7 +135,64 @@ RE1.mastership_state: backup
 
 ---
 
-## 3. Directory Structure Example
+## 3. Executing RedHat Facts Using juniper.device Namespace
+
+Same RedHat module (junos_facts) callable through `juniper.device` collection namespace.
+
+```ini
+[junos]
+<Device IP>
+
+[junos:vars]
+ansible_network_os=juniper.device.junos
+ansible_ssh_user=<username>
+ansible_ssh_pass=<password>
+ansible_port=22
+ansible_connection=ansible.netcommon.netconf
+
+[all:vars]
+ansible_python_interpreter=<python interpreter path>
+```
+
+### Playbook
+
+```yaml
+---
+- name: Gather Junos facts (RedHat module path via juniper.device namespace)
+  hosts: junos
+  gather_facts: false
+  connection: ansible.netcommon.netconf
+  collections:
+    - juniper.device
+
+  tasks:
+    - name: Collect default subset
+      juniper.device.junos_facts:
+      register: rh_facts
+
+    - name: Show facts
+      debug:
+        var: rh_facts
+```
+
+### Run
+
+```bash
+ansible-playbook -i inventory_rh pb.redhat_facts.yml
+```
+
+### Sample Output (Excerpt)
+
+```
+ansible_net_hostname: evoeventtestb
+ansible_net_model: mx960
+ansible_net_system: junos
+ansible_net_version: 25.4I-20250615_dev_common.0.1157
+```
+
+---
+
+## 4. Directory Structure Example
 
 ```
 _playbooks/
@@ -144,43 +204,43 @@ inventory_native
 
 ---
 
-## 4. Returned Data Fields
+## 5. Returned Data Fields
 
 | RedHat Path Key (ansible_facts) | Native Path Key (ansible_facts.junos) | Notes |
 |---------------------------------|----------------------------------------|-------|
 | ansible_net_hostname            | hostname                               | Device host-name |
 | ansible_net_model               | model                                  | Chassis model |
 | ansible_net_version             | version                                | Junos version |
-| ansible_net_serialnum           | serialnumber                           | Serial |
-| (not present)                   | RE0 / RE1 maps                         | Routing engine details |
+| ansible_net_serialnum           | serialnumber                           | Serial number |
+| (not present)                   | RE0 / RE1 maps                         | RE operational states |
 | (not present)                   | up_time                                | Human readable uptime |
 | ansible_net_system              | (implicit junos)                       | OS identifier |
 
-Native output contains deeper per-RE and platform metadata.
+Native adds richer per-RE/platform context.
 
 ---
 
-## 5. Facts Cheat Sheet (Native)
+## 6. Facts Cheat Sheet (Native)
 
 | Goal | Approach |
 |------|----------|
-| Basic platform data | Use task with no params |
-| Access hostname | native_facts.ansible_facts.junos.hostname |
-| RE status | native_facts.ansible_facts.junos.RE0.status |
-| Serial number | native_facts.ansible_facts.junos.serialnumber |
-| Conditional logic | when: native_facts.ansible_facts.junos.RE0.mastership_state == 'master' |
+| Basic platform data | Run module without params |
+| Hostname | native_facts.ansible_facts.junos.hostname |
+| Serial | native_facts.ansible_facts.junos.serialnumber |
+| RE master state | native_facts.ansible_facts.junos.RE0.mastership_state |
+| Conditional task | when: native_facts.ansible_facts.junos.model == "MX960" |
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Warning: NoneType .get | Loader quirk in RedHat path | Ignore if task succeeds |
+| Warning: NoneType .get | Loader quirk | Ignore if success |
 | Connection failure | NETCONF disabled | set system services netconf ssh |
-| Timeout | Large device / slow RE | Increase ansible_command_timeout |
-| Missing RE data (native) | Single RE platform | Normal |
-| Empty facts | Auth / privilege issue | Validate credentials via NETCONF |
+| Timeout | Large chassis | Increase ansible_command_timeout |
+| Missing RE1 data | Single RE device | Normal |
+| Empty facts | Auth/privilege | Verify creds & NETCONF |
 
 Quick tests:
 
@@ -191,8 +251,8 @@ nc -vz <device-ip> 830
 
 ---
 
-## 7. Summary
+## 8. Summary
 
-- RedHat `junipernetworks.junos.junos_facts` module path works unchanged inside `juniper.device`.
-- Native `juniper.device.facts` provides extended Junos-specific details (RE, uptime, richer keys).
-- Run both side by side; adopt native path for new automation without breaking
+- RedHat `junipernetworks.junos.junos_facts` runs unchanged inside `juniper.device`.
+- Native `juniper.device.facts` returns enhanced Junos-specific structures.
+- Both can coexist; adopt native for new automation while keeping existing
