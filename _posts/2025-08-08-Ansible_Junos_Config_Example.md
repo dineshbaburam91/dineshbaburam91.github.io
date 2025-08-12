@@ -1,6 +1,6 @@
 ---
 title: "Ansible Junos Configuration: RedHat junipernetworks.junos Logging vs juniper.device Config"
-date: 2025-08-08 12:00:00 -500
+date: 2025-08-10 12:00:00 -500
 categories: [JuniperAutomation, ansible, junos]
 tags: [ansible, junos, juniper, automation, logging, config, netconf, pyez, rollback, diff, compatibility]
 ---
